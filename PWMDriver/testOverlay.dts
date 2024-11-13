@@ -1,0 +1,24 @@
+/dts-v1/;
+/plugin/;
+/ {
+    compatible = "raspberrypi,3-model-b-plus\0brcm,bcm2837";
+    fragment@0 {
+        target-path = "/";
+        __overlay__ {
+            myPWM:myPWM {
+                compatible = "starlight,PWM";
+                status ="okay";
+                pwms = <&pwm 0 5000000 0>;
+                pinctrl-names = "default";
+                pinctrl-0 = <&pwm0_gpio12>;
+                pwm-names = "myPWM";
+            };
+        };
+    };
+    fragment@1 {
+        target = <&pwm>;
+        frag1: __overlay__ {
+            status = "okay";
+        };
+    };
+};
