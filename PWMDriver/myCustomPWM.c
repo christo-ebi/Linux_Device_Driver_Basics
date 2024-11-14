@@ -5,13 +5,10 @@
 #include <linux/platform_device.h>
 #include <linux/pwm.h>
 
-#define MYMAJOR 90                //Major Number 
-#define MINOR_NUMBER 11           //Minor Number requested.
+#define MINOR_NUMBER_RANGE 0      //Minor Number Range.
 #define MINOR_NUM_COUNT 1         //Number of Minor Number count.
 #define DRIVER_NAME "myCustomPWM" //Name for the driver.
 #define DRIVER_CLASS "myPWMClass" //Name for the driver class.
-
-#define BUFFER_SIZE 1024
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("CHRIS");
@@ -82,24 +79,12 @@ int my_probe(struct platform_device *plat_dev)
       return -1;
     }
 
-    ret_val = pwm_enable(myPWMDev);
-
-    printk(KERN_DEBUG "%s :: pwm_enable :: retVal: %d !",DRIVER_NAME,ret_val);
-
-    if(ret_val<0)
-    {
-      printk(KERN_DEBUG "%s ::PWM Enable failed :: Error:%d !",DRIVER_NAME,ret_val);
-      return -1;
-    }
-
-    printk(KERN_DEBUG "%s ::PWM Request Successful !",DRIVER_NAME);
-
     return 0;
 }
 
 int my_remove(struct platform_device *plat_dev)
 {
-    pwm_disable(myPWMDev);
+    pwm_disable(myPWMDev); //Disable pwm while unloading the driver.
 	  pwm_put(myPWMDev);
     printk(KERN_DEBUG "%s :: Probe -> Remove !",DRIVER_NAME);
     return 0;
@@ -159,10 +144,10 @@ static ssize_t driver_read(struct file *File, char *user_buffer,size_t count, lo
 
   if(*offs>to_copy)
   {
-    return 0;
+    return 0; //0 indicates end of file.
   }
 
-  return delta;
+  return delta; //No of bytes copied.
 }
 
 /**
@@ -172,38 +157,51 @@ static ssize_t driver_read(struct file *File, char *user_buffer,size_t count, lo
 static ssize_t driver_write(struct file *File,const char *user_buffer,size_t count, loff_t *offs)
 {
   printk(KERN_DEBUG "%s :: fops->Write !",DRIVER_NAME);
+
+  if(count > 2) //write expects only one char and /0.
+  {
+    return -1; 
+  }
   
-  int to_copy, not_copied, delta;
+  int not_copied;
   char value;
 
-  to_copy = min(count,sizeof(value));
-  
-  not_copied = copy_from_user(&value, user_buffer, to_copy);
+  not_copied = copy_from_user(&value, user_buffer, sizeof(value));
+
+  if(not_copied !=0) // Copy not successful retry.
+  {
+    return 0; //Indicating nothing copied. -> Retry.
+  }
 
   switch(value)
   {
-    case '0':{
-      if(pwm_enable(myPWMDev))
+    case '1':{
+      if(!pwm_enable(myPWMDev))
       {
-        Enable_Flag = false;
+        Enable_Flag = true;
+      }
+      else
+      {
+        return -1; //Enable failed.
       }
       break;
     }
 
-    case '1':{
+    case '0':{
       pwm_disable(myPWMDev);
-      Enable_Flag = true;
+      Enable_Flag = false;
       break;
     }
 
     default:{
-      printk(KERN_DEBUG "%s :: Write->Invalid !",DRIVER_NAME);
+      if(count==0)
+      { 
+        printk(KERN_DEBUG "%s :: Write->Invalid !",DRIVER_NAME);
+      }     
     }
   }
 
-  delta = to_copy - not_copied;
-
-  return delta;
+  return 1; //Return length of data copied.
 }
 
 static struct file_operations fops = {
@@ -247,10 +245,10 @@ static int __init ModuleInit(void)
   * 
   */
   
-  // Request minor number with range [0-0] with 1 number of minor number.
+  // Request minor number with range 0 = [0-0] with 1 number of minor number.
   //Creates an entry in /sys/module/myCustomPWM
 
-  if(alloc_chrdev_region(&my_device_nr, 0, 1, DRIVER_NAME) > -1 )
+  if(alloc_chrdev_region(&my_device_nr, MINOR_NUMBER_RANGE, MINOR_NUM_COUNT, DRIVER_NAME) > -1 )
   {
     printk(KERN_DEBUG "%s :: myDevNum - registered Device Major Version: %d, Minor Version: %d \n",DRIVER_NAME,MAJOR(my_device_nr), MINOR(my_device_nr));
   }
