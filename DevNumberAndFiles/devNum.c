@@ -51,7 +51,7 @@ static int __init ModuleInit(void)
   }
   else if(retval > 0)
   {
-    printk("myDevNum - registered Device Major Version: %d, Minor Version: %d \n",retval>>20, retval&0xfffff);
+    printk("myDevNum - registered Device Major Version: %d, Minor Version: %d \n",MAJOR(retval), MINOR(retval));
   }
   else{
     printk("myDevNum - could not register device number !\n");
